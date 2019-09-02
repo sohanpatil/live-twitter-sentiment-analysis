@@ -12,6 +12,7 @@ import pandas as pd
 app = dash.Dash(__name__)
 app.layout = html.Div(
     [   html.H2('Live Twitter Sentiment'),
+        dcc.Input(id='sentiment_term', value='olympic', type='text'), #works fine
         dcc.Graph(id='live-graph', animate=True),
         dcc.Interval(
             id='graph-update',
@@ -22,18 +23,19 @@ app.layout = html.Div(
 )
 
 @app.callback(Output('live-graph', 'figure'),
-              [Input('graph-update', 'n_intervals')])
-def update_graph_scatter(interval):
+              [Input(component_id='sentiment_term', component_property='value'), Input('graph-update', 'n_intervals')])
+def update_graph_scatter(sentiment_term, interval):
     try:
+        print(sentiment_term)
         conn = sqlite3.connect('twitter.db')
         c = conn.cursor()
-        df = pd.read_sql("SELECT * FROM sentiment WHERE tweet LIKE '%trump%' ORDER BY unix DESC LIMIT 1000", conn)
+        df = pd.read_sql("SELECT * FROM sentiment WHERE tweet LIKE ? ORDER BY unix DESC LIMIT 200", conn, params=('%' + sentiment_term + '%',))
         df.sort_values('unix', inplace=True)
         df['sentiment_smoothed'] = df['sentiment'].rolling(int((len(df))/5)).mean()
         print(df.tail())
         df['date'] = pd.to_datetime(df['unix'],unit='ms')
         df.set_index('date', inplace=True)
-        df = df.resample('1s').mean()
+        df = df.resample('1min').mean()
         df.dropna(inplace=True)
 
         X = df.unix.values[-100:]
